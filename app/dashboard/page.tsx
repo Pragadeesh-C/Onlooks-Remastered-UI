@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import {
@@ -28,6 +28,9 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("All")
   const { predictions, hasPredictions } = usePredictions()
   const { setPredictions } = usePredictions()
+  const [studentPredictions, setStudentPredictions] = useState([])
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 5 // Number of students per page
   const [stats, setStats] = useState({
     total_students: 0,
     dropout_rate: 0,
@@ -36,91 +39,30 @@ export default function Dashboard() {
   })
   const [trendData, setTrendData] = useState({ labels: [], dropoutData: [], continueData: [] })
 
-  // Sample student data
-  const students = [
-    {
-      id: "#1001",
-      name: "Amit Kumar",
-      avatar: "/placeholder.svg?height=40&width=40",
-      class: "10",
-      enrollmentDate: "Sep 12, 2 PM",
-      lastAttendance: "Sep 14, 12 PM",
-      predictedDate: "Aug 4, 2024",
-      predictedTime: "12:24 PM",
-      status:
-        hasPredictions && predictions.length > 0
-          ? predictions[0].ML_Prediction === "Will DropOut"
-            ? "Dropout"
-            : "Continue"
-          : "Dropout",
-    },
-    {
-      id: "#1002",
-      name: "Sita Sharma",
-      avatar: "/placeholder.svg?height=40&width=40",
-      class: "9",
-      enrollmentDate: "Sep 15, 4 PM",
-      lastAttendance: "Sep 18, 12 PM",
-      predictedDate: "Sep 2, 2024",
-      predictedTime: "10:14 PM",
-      status:
-        hasPredictions && predictions.length > 1
-          ? predictions[1].ML_Prediction === "Will DropOut"
-            ? "Dropout"
-            : "Continue"
-          : "Continue",
-    },
-    {
-      id: "#1003",
-      name: "Rahul Verma",
-      avatar: "/placeholder.svg?height=40&width=40",
-      class: "11",
-      enrollmentDate: "Sep 20, 2 PM",
-      lastAttendance: "Sep 24, 12 PM",
-      predictedDate: "Sep 18, 2024",
-      predictedTime: "01:14 PM",
-      status:
-        hasPredictions && predictions.length > 2
-          ? predictions[2].ML_Prediction === "Will DropOut"
-            ? "Dropout"
-            : "Continue"
-          : "Dropout",
-    },
-    {
-      id: "#1004",
-      name: "Priya Singh",
-      avatar: "/placeholder.svg?height=40&width=40",
-      class: "8",
-      enrollmentDate: "Sep 26, 2 PM",
-      lastAttendance: "Sep 28, 12 PM",
-      predictedDate: "Sep 10, 2024",
-      predictedTime: "10:55 PM",
-      status:
-        hasPredictions && predictions.length > 3
-          ? predictions[3].ML_Prediction === "Will DropOut"
-            ? "Dropout"
-            : "Continue"
-          : "Continue",
-    },
-    {
-      id: "#1005",
-      name: "Aditya Das",
-      avatar: "/placeholder.svg?height=40&width=40",
-      class: "10",
-      enrollmentDate: "Sep 28, 5 PM",
-      lastAttendance: "Sep 30, 7 PM",
-      predictedDate: "Sep 20, 2024",
-      predictedTime: "1:45 PM",
-      status: "Dropout",
-    },
-  ]
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setCurrentPage(1); // Reset to first page when changing filter
+  };
 
-  // Filter students based on active tab
-  const filteredStudents = activeTab === "All" ? students : students.filter((student) => student.status === activeTab)
+  
+  const filteredStudents = useMemo(() => {
+    if (activeTab === "All") return studentPredictions
+    return studentPredictions.filter((s) => s.prediction === activeTab)
+  }, [activeTab, studentPredictions]) // Recalculates only when activeTab or studentPredictions change
+  
+  const paginatedStudents = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize
+    return filteredStudents.slice(startIndex, startIndex + pageSize)
+  }, [filteredStudents, currentPage])
 
+  const totalPages = Math.ceil(filteredStudents.length / pageSize)
+
+  const goToPage = (page) => {
+    if (page >= 1 && page <= totalPages) setCurrentPage(page)
+  }
   // Calculate statistics
-  const dropoutCount = students.filter((s) => s.status === "Dropout").length
-  const continueCount = students.filter((s) => s.status === "Continue").length
+  const dropoutCount = predictions.filter((s) => s.ML_Prediction === "Will DropOut").length
+  const continueCount = predictions.filter((s) => s.ML_Prediction === "Will Continue").length
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -133,26 +75,33 @@ export default function Dashboard() {
           }
         })
         if (!response.ok) throw new Error("Failed to fetch stats")
-
+  
         const data = await response.json()
         setStats(data)
-      
+  
         const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-
-        setTrendData({labels: data.monthly_trends.map(entry => monthNames[entry.month - 1]), // Extracts month number
-        dropoutData: data.monthly_trends.map(entry => entry.dropout_count),
-        continueData: data.monthly_trends.map(entry => entry.continue_count), }) // Set state safely
-
+  
+        setTrendData({
+          labels: data.monthly_trends.map(entry => monthNames[entry.month - 1]), // Extracts month number
+          dropoutData: data.monthly_trends.map(entry => entry.dropout_count),
+          continueData: data.monthly_trends.map(entry => entry.continue_count),
+        }) // Set state safely
+  
         if (data.recent_predictions) {
           setPredictions(data.recent_predictions) // ✅ Update predictions state
+        }
+  
+        if (data.student_predictions) {
+          setStudentPredictions(data.student_predictions) // ✅ Store student_predictions in state
         }
       } catch (error) {
         console.error("Error fetching stats:", error)
       }
     }
-
+  
     fetchStats()
-  }, [setPredictions]) // ✅ Ensure useEffect re-runs when `setPredictions` changes
+  }, [setPredictions, setStudentPredictions]) // ✅ Added `setStudentPredictions` dependency
+  // ✅ Ensure useEffect re-runs when `setPredictions` changes
 
 
 
@@ -348,23 +297,23 @@ export default function Dashboard() {
           <Button
             variant={activeTab === "All" ? "default" : "ghost"}
             className={`flex-1 rounded-full ${activeTab === "All" ? "bg-pink-500 text-white" : ""}`}
-            onClick={() => setActiveTab("All")}
+            onClick={() => handleTabChange("All")}
           >
-            All {students.length}
+            All {studentPredictions.length}
           </Button>
           <Button
-            variant={activeTab === "Dropout" ? "default" : "ghost"}
+            variant={activeTab === "Will DropOut" ? "default" : "ghost"}
             className={`flex-1 rounded-full ${activeTab === "Dropout" ? "bg-pink-500 text-white" : ""}`}
-            onClick={() => setActiveTab("Dropout")}
+            onClick={() => handleTabChange("Will DropOut")}
           >
-            Dropout {students.filter((s) => s.status === "Dropout").length}
+            Dropout {studentPredictions.filter((s) => s.prediction === "Will DropOut").length}
           </Button>
           <Button
-            variant={activeTab === "Continue" ? "default" : "ghost"}
-            className={`flex-1 rounded-full ${activeTab === "Continue" ? "bg-pink-500 text-white" : ""}`}
-            onClick={() => setActiveTab("Continue")}
+            variant={activeTab === "Will Continue" ? "default" : "ghost"}
+            className={`flex-1 rounded-full ${activeTab === "Will Continue" ? "bg-pink-500 text-white" : ""}`}
+            onClick={() => handleTabChange("Will Continue")}
           >
-            Continue {students.filter((s) => s.status === "Continue").length}
+            Continue {studentPredictions.filter((s) => s.prediction === "Will Continue").length}
           </Button>
         </div>
 
@@ -375,47 +324,43 @@ export default function Dashboard() {
                 <tr className="border-b text-left text-sm text-gray-500">
                   <th className="px-4 py-3">#</th>
                   <th className="px-4 py-3">Student</th>
-                  <th className="px-4 py-3">Enrollment</th>
-                  <th className="px-4 py-3">Last Attendance</th>
                   <th className="px-4 py-3">Predicted Date</th>
                   <th className="px-4 py-3">Prediction</th>
                   <th className="px-4 py-3"></th>
                 </tr>
               </thead>
               <tbody>
-                {filteredStudents.map((student) => (
+                { paginatedStudents.map((student) => (
                   <tr key={student.id} className="border-b text-sm">
-                    <td className="px-4 py-3 text-pink-500">{student.id}</td>
+                    <td className="px-4 py-3 text-pink-500">{student.student_id}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         <div className="h-8 w-8 overflow-hidden rounded-full">
                           <Image
                             src={student.avatar || "/placeholder.svg"}
-                            alt={student.name}
+                            alt={student.student_name}
                             width={32}
                             height={32}
                             className="h-full w-full object-cover"
                           />
                         </div>
                         <div>
-                          <div className="font-medium">{student.name}</div>
+                          <div className="font-medium">{student.student_name}</div>
                           <div className="text-xs text-gray-500">Class {student.class}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-3">{student.enrollmentDate}</td>
-                    <td className="px-4 py-3">{student.lastAttendance}</td>
                     <td className="px-4 py-3">
                       {student.predictedDate}
-                      <div className="text-xs text-gray-500">{student.predictedTime}</div>
+                      <div className="text-xs text-gray-500">{student.predicted_date}</div>
                     </td>
                     <td className="px-4 py-3">
                       <span
                         className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
-                          student.status === "Dropout" ? "bg-red-100 text-red-600" : "bg-green-100 text-green-600"
+                          student.prediction === "Will DropOut" ? "bg-red-100 text-red-600" : "bg-green-100 text-green-600"
                         }`}
                       >
-                        {student.status}
+                        {student.prediction}
                       </span>
                     </td>
                     <td className="px-4 py-3">
@@ -439,31 +384,19 @@ export default function Dashboard() {
             </table>
           </div>
           <div className="flex items-center justify-between border-t px-4 py-3">
-            <div className="flex items-center gap-1">
-              <Button variant="outline" size="icon" className="h-8 w-8 rounded-md bg-gray-900 text-white">
-                1
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md">
-                2
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md">
-                3
-              </Button>
-              <span>...</span>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md">
-                15
-              </Button>
-            </div>
-            <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md">
-                &lt;
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-md">
-                &gt;
-              </Button>
-            </div>
-          </div>
-        </div>
+        <Button variant="ghost" size="icon" disabled={currentPage === 1} onClick={() => goToPage(currentPage - 1)}>
+          &lt;
+        </Button>
+        {[...Array(totalPages)].map((_, index) => (
+          <Button key={index} variant={currentPage === index + 1 ? "outline" : "ghost"} size="icon" onClick={() => goToPage(index + 1)}>
+            {index + 1}
+          </Button>
+        ))}
+        <Button variant="ghost" size="icon" disabled={currentPage === totalPages} onClick={() => goToPage(currentPage + 1)}>
+          &gt;
+        </Button>
+      </div>
+    </div>
       </div>
     </div>
   )
