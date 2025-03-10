@@ -20,7 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Navbar } from "@/components/layout/navbar"
 import { StudentChart } from "@/components/dashboard/student-chart"
-import { AttendanceChart } from "@/components/dashboard/attendance-chart"
+import { AttendanceChart, DashboardChart } from "@/components/dashboard/attendance-chart"
 import { PredictionWidget } from "@/components/dashboard/prediction-widget"
 import { usePredictions } from "@/context/prediction-context"
 
@@ -119,12 +119,7 @@ export default function Dashboard() {
               <Download className="h-4 w-4" />
               Export
             </Button>
-            <Button variant="outline" size="icon" className="rounded-full bg-white">
-              <BarChart3 className="h-5 w-5" />
-            </Button>
-            <Button variant="outline" size="icon" className="rounded-full bg-white">
-              <Calendar className="h-5 w-5" />
-            </Button>
+            
           </div>
         </div>
 
@@ -274,21 +269,18 @@ export default function Dashboard() {
 
           <Card className="bg-white">
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-lg font-medium">Attendance Overview</CardTitle>
+              <CardTitle className="text-lg font-medium">Dropout Overview</CardTitle>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon">
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem>View Details</DropdownMenuItem>
-                  <DropdownMenuItem>Download Data</DropdownMenuItem>
-                </DropdownMenuContent>
+                
               </DropdownMenu>
             </CardHeader>
             <CardContent>
-              <AttendanceChart />
+              <DashboardChart />
             </CardContent>
           </Card>
         </div>
@@ -364,7 +356,7 @@ export default function Dashboard() {
                       </span>
                     </td>
                     <td className="px-4 py-3">
-                      <DropdownMenu>
+                      {/* <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="icon">
                             <MoreVertical className="h-4 w-4" />
@@ -373,10 +365,8 @@ export default function Dashboard() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem>View Details</DropdownMenuItem>
-                          <DropdownMenuItem>Edit Student</DropdownMenuItem>
-                          <DropdownMenuItem>Contact Student</DropdownMenuItem>
                         </DropdownMenuContent>
-                      </DropdownMenu>
+                      </DropdownMenu> */}
                     </td>
                   </tr>
                 ))}

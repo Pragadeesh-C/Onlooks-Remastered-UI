@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Eye, EyeOff, FileSpreadsheet, UserPlus } from "lucide-react"
@@ -25,6 +25,26 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+      const token = localStorage.getItem("token");
+  
+      if (token) {
+        // Validate token by checking expiry
+        try {
+          const payload = JSON.parse(atob(token.split(".")[1])); // Decode JWT payload
+          const isExpired = payload.exp * 1000 < Date.now();
+  
+          if (!isExpired) {
+            router.push("/dashboard"); // Redirect to dashboard if token is valid
+            return;
+          }
+        } catch (error) {
+          console.error("Invalid token:", error);
+        }
+      }
+  
+    }, [router]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target
@@ -168,7 +188,6 @@ export default function RegisterPage() {
                     <SelectContent>
                       <SelectItem value="teacher">Teacher</SelectItem>
                       <SelectItem value="principal">Principal</SelectItem>
-                      <SelectItem value="counselor">Counselor</SelectItem>
                       <SelectItem value="admin">Administrator</SelectItem>
                     </SelectContent>
                   </Select>

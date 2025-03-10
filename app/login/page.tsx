@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { Eye, EyeOff, FileSpreadsheet, LogIn } from "lucide-react"
@@ -18,6 +18,26 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+      const token = localStorage.getItem("token");
+  
+      if (token) {
+        // Validate token by checking expiry
+        try {
+          const payload = JSON.parse(atob(token.split(".")[1])); // Decode JWT payload
+          const isExpired = payload.exp * 1000 < Date.now();
+  
+          if (!isExpired) {
+            router.push("/dashboard"); // Redirect to dashboard if token is valid
+            return;
+          }
+        } catch (error) {
+          console.error("Invalid token:", error);
+        }
+      }
+  
+    }, [router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -93,9 +113,9 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">Password</Label>
-                  <Link href="/forgot-password" className="text-xs text-pink-500 hover:underline">
+                  {/* <Link href="/forgot-password" className="text-xs text-pink-500 hover:underline">
                     Forgot password?
-                  </Link>
+                  </Link> */}
                 </div>
                 <div className="relative">
                   <Input

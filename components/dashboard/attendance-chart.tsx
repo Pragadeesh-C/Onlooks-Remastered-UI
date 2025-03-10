@@ -1,13 +1,41 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Chart, registerables } from "chart.js"
 
 Chart.register(...registerables)
 
-export function AttendanceChart() {
+export function DashboardChart() {
   const chartRef = useRef<HTMLCanvasElement>(null)
   const chartInstance = useRef<Chart | null>(null)
+  const [stats, setStats] = useState({
+    dropout_rate: 0,
+    continue_rate: 0,
+  })
+
+  useEffect(() => {
+    // Fetch data from the stats route (replace this with your actual API request)
+    const fetchStats = async () => {
+      try {
+        const response = await fetch("/stats")
+        const data = await response.json()
+        setStats({
+          dropout_rate: data.dropout_rate,
+          continue_rate: data.continue_rate,
+        })
+      } catch (error) {
+        console.error("Error fetching stats:", error)
+      }
+    }
+
+    fetchStats()
+
+    return () => {
+      if (chartInstance.current) {
+        chartInstance.current.destroy()
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (!chartRef.current) return
@@ -17,33 +45,27 @@ export function AttendanceChart() {
       chartInstance.current.destroy()
     }
 
-    // Sample data
-    const data = [75, 85, 65, 90, 78]
-    const labels = ["Class 6", "Class 7", "Class 8", "Class 9", "Class 10"]
+    // Create new chart with fetched data
+    const { dropout_rate, continue_rate } = stats
+    const data = [dropout_rate, continue_rate]
+    const labels = ["Dropout Rate", "Continue Rate"]
 
-    // Create new chart
     const ctx = chartRef.current.getContext("2d")
     if (ctx) {
       chartInstance.current = new Chart(ctx, {
-        type: "doughnut",
+        type: "pie",
         data: {
           labels: labels,
           datasets: [
             {
               data: data,
               backgroundColor: [
-                "rgba(255, 99, 132, 0.7)",
-                "rgba(54, 162, 235, 0.7)",
-                "rgba(255, 206, 86, 0.7)",
-                "rgba(75, 192, 192, 0.7)",
-                "rgba(153, 102, 255, 0.7)",
+                "rgba(255, 99, 132, 0.7)", // Dropout Rate
+                "rgba(54, 162, 235, 0.7)", // Continue Rate
               ],
               borderColor: [
                 "rgba(255, 99, 132, 1)",
                 "rgba(54, 162, 235, 1)",
-                "rgba(255, 206, 86, 1)",
-                "rgba(75, 192, 192, 1)",
-                "rgba(153, 102, 255, 1)",
               ],
               borderWidth: 1,
             },
@@ -54,7 +76,7 @@ export function AttendanceChart() {
           maintainAspectRatio: false,
           plugins: {
             legend: {
-              position: "right",
+              position: "top",
               labels: {
                 usePointStyle: true,
                 boxWidth: 6,
@@ -66,7 +88,6 @@ export function AttendanceChart() {
               },
             },
           },
-          cutout: "70%",
         },
       })
     }
@@ -76,7 +97,7 @@ export function AttendanceChart() {
         chartInstance.current.destroy()
       }
     }
-  }, [])
+  }, [stats])
 
   return (
     <div className="h-[300px] w-full">
@@ -84,4 +105,3 @@ export function AttendanceChart() {
     </div>
   )
 }
-

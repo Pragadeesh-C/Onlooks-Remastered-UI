@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Bell, FileSpreadsheet, Home, LogOut, Menu, Settings, User, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
@@ -13,13 +13,38 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { jwtDecode } from "jwt-decode"
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false)
+  const [user, setUser] = useState<{ email: string; role: string; school_name: string } | null>(null)
   const pathname = usePathname()
+  const router = useRouter() // for navigation
 
   const isActive = (path: string) => {
     return pathname === path
+  }
+
+  useEffect(() => {
+    const token = localStorage.getItem("token")
+    if (token) {
+      try {
+        const decoded: any = jwtDecode(token)
+        setUser({
+          email: decoded.sub, // Extract email (sub) from the token
+          role: decoded.role, // Extract role
+          school_name: decoded.school_name, // Extract school name
+        })
+      } catch (error) {
+        console.error("Failed to decode token:", error)
+      }
+    }
+  }, [])
+
+  const handleLogout = () => {
+    localStorage.removeItem("token") // Remove token from local storage
+    setUser(null) // Clear the user state
+    router.push("/login") // Redirect to login page
   }
 
   return (
@@ -83,8 +108,8 @@ export function Navbar() {
             <DropdownMenuContent align="end">
               <div className="flex items-center justify-start gap-2 p-2">
                 <div className="flex flex-col space-y-1 leading-none">
-                  <p className="font-medium">Ms. Sharma</p>
-                  <p className="text-sm text-muted-foreground">sharma@school.edu</p>
+                  <p className="font-medium">{user?.email || "User"}</p>
+                  <p className="text-sm text-muted-foreground">{user?.school_name || "No School Name"}</p>
                 </div>
               </div>
               <DropdownMenuSeparator />
@@ -102,10 +127,13 @@ export function Navbar() {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link href="/login" className="flex w-full cursor-pointer items-center text-red-500 hover:text-red-600">
+                <a
+                  onClick={handleLogout}
+                  className="flex w-full cursor-pointer items-center text-red-500 hover:text-red-600"
+                >
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Log out</span>
-                </Link>
+                </a>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -156,4 +184,3 @@ export function Navbar() {
     </nav>
   )
 }
-
