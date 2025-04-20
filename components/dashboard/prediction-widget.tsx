@@ -36,44 +36,36 @@ export function PredictionWidget() {
     <Card>
       <CardHeader>
         <CardTitle>Student Predictions</CardTitle>
-        <CardDescription>Latest dropout prediction analysis</CardDescription>
+        <CardDescription>Current dropout risk assessment</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div>
-          <div className="mb-1 flex items-center justify-between">
-            <div className="flex items-center gap-1 text-sm font-medium">
+      <CardContent className="space-y-8">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2">
               <AlertTriangle className="h-4 w-4 text-red-500" />
               <span>Dropout Risk</span>
             </div>
-            <span className="text-sm text-gray-500">{dropoutCount} students</span>
+            <span className="font-medium">{dropoutRate}%</span>
           </div>
-          <Progress value={dropoutRate} className="h-2" indicatorClassName="bg-red-500" />
+          <Progress value={dropoutRate} variant="dropout" />
         </div>
 
-        <div>
-          <div className="mb-1 flex items-center justify-between">
-            <div className="flex items-center gap-1 text-sm font-medium">
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <div className="flex items-center gap-2">
               <CheckCircle className="h-4 w-4 text-green-500" />
               <span>Likely to Continue</span>
             </div>
-            <span className="text-sm text-gray-500">{continueCount} students</span>
+            <span className="font-medium">{continueRate}%</span>
           </div>
-          <Progress value={continueRate} className="h-2" indicatorClassName="bg-green-500" />
-        </div>
-
-        <div className="rounded-lg bg-gray-50 p-3">
-          <p className="text-sm text-gray-600">
-            {dropoutCount > 0
-              ? `${dropoutCount} students need immediate attention to prevent dropout.`
-              : "All students are on track to continue their education."}
-          </p>
+          <Progress value={continueRate} variant="continue" />
         </div>
       </CardContent>
       <CardFooter>
-        <Button asChild variant="outline" className="w-full" size="sm">
-          <Link href="/predictions" className="flex items-center gap-1">
-            <span>View Detailed Analysis</span>
-            <ExternalLink className="h-3 w-3" />
+        <Button asChild variant="outline" className="w-full">
+          <Link href="/predictions" className="flex items-center justify-center gap-2">
+            View All Predictions
+            <ExternalLink className="h-4 w-4" />
           </Link>
         </Button>
       </CardFooter>

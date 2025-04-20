@@ -23,6 +23,8 @@ import { StudentChart } from "@/components/dashboard/student-chart"
 import { AttendanceChart, DashboardChart } from "@/components/dashboard/attendance-chart"
 import { PredictionWidget } from "@/components/dashboard/prediction-widget"
 import { usePredictions } from "@/context/prediction-context"
+import { useApi } from '@/hooks/useApi';
+import { useRouter } from "next/navigation"
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("All")
@@ -38,6 +40,8 @@ export default function Dashboard() {
     predictions_made: 0
   })
   const [trendData, setTrendData] = useState({ labels: [], dropoutData: [], continueData: [] })
+  const { fetchWithAuth } = useApi();
+  const router = useRouter();
 
   const handleTabChange = (tab) => {
     setActiveTab(tab);
@@ -64,43 +68,79 @@ export default function Dashboard() {
   const dropoutCount = predictions.filter((s) => s.ML_Prediction === "Will DropOut").length
   const continueCount = predictions.filter((s) => s.ML_Prediction === "Will Continue").length
 
+  const downloadTrendsCSV = () => {
+    if (!trendData.labels.length) {
+      console.warn("No data available for download.")
+      return
+    }
+
+    let csvContent = "Month,Dropout Count,Continue Count\n"
+
+    trendData.labels.forEach((label, index) => {
+      csvContent += `${label},${trendData.dropoutData[index]},${trendData.continueData[index]}\n`
+    })
+
+    const blob = new Blob([csvContent], { type: "text/csv" })
+    const link = document.createElement("a")
+    link.href = URL.createObjectURL(blob)
+    link.download = "student_dropout_trends.csv"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const downloadPieCSV = () => {
+    const csvContent = "Category,Percentage\n" +
+      `Dropout Rate,${stats.dropout_rate}%\n` +
+      `Continue Rate,${stats.continue_rate}%\n`
+
+    const blob = new Blob([csvContent], { type: "text/csv" })
+    const link = document.createElement("a")
+    link.href = URL.createObjectURL(blob)
+    link.download = "dropout_overview.csv"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const token = localStorage.getItem("token") // Assuming JWT is stored
-        console.log(token)
-        const response = await fetch("http://127.0.0.1:8000/stats", {
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        })
-        if (!response.ok) throw new Error("Failed to fetch stats")
-  
-        const data = await response.json()
-        setStats(data)
-  
-        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-  
+        console.log("fetching stats")
+        const response = await fetchWithAuth("/stats");
+        if (response === null) {
+          return; // Early return if we got a 401
+        }
+        
+        const data = await response.json();
+        setStats(data);
+
+        const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
         setTrendData({
-          labels: data.monthly_trends.map(entry => monthNames[entry.month - 1]), // Extracts month number
-          dropoutData: data.monthly_trends.map(entry => entry.dropout_count),
-          continueData: data.monthly_trends.map(entry => entry.continue_count),
-        }) // Set state safely
-  
+          labels: data.monthly_trends.map((entry: any) => monthNames[entry.month - 1]),
+          dropoutData: data.monthly_trends.map((entry: any) => entry.dropout_count),
+          continueData: data.monthly_trends.map((entry: any) => entry.continue_count),
+        });
+
         if (data.recent_predictions) {
-          setPredictions(data.recent_predictions) // ✅ Update predictions state
+          setPredictions(data.recent_predictions);
         }
-  
+
         if (data.student_predictions) {
-          setStudentPredictions(data.student_predictions) // ✅ Store student_predictions in state
+          setStudentPredictions(data.student_predictions);
         }
-      } catch (error) {
-        console.error("Error fetching stats:", error)
+      } catch (error: any) {
+        console.error("Error fetching stats:", error);
+        if (error.message === 'Session expired. Please login again.') {
+          router.push('/login');
+        }
       }
-    }
-  
-    fetchStats()
-  }, [setPredictions, setStudentPredictions]) // ✅ Added `setStudentPredictions` dependency
+    };
+
+    fetchStats();
+  }, [setPredictions, setStudentPredictions, router]);
   // ✅ Ensure useEffect re-runs when `setPredictions` changes
 
 
@@ -115,10 +155,10 @@ export default function Dashboard() {
             <p className="text-gray-500">Monitor student performance and dropout predictions</p>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" className="gap-1 bg-white">
+            {/* <Button variant="outline" size="sm" className="gap-1 bg-white">
               <Download className="h-4 w-4" />
               Export
-            </Button>
+            </Button> */}
             
           </div>
         </div>
@@ -205,7 +245,7 @@ export default function Dashboard() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem>View Details</DropdownMenuItem>
-                  <DropdownMenuItem>Download Data</DropdownMenuItem>
+                  <DropdownMenuItem onClick={downloadTrendsCSV}>Download Data</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </CardHeader>
@@ -241,7 +281,7 @@ export default function Dashboard() {
                       </div>
                       <div className="flex-1">
                         <p className="text-sm font-medium">
-                          Student #{index + 1} -{" "}
+                          {prediction.Student_Name} -{" "}
                           <span
                             className={prediction.ML_Prediction === "Will DropOut" ? "text-red-600" : "text-green-600"}
                           >
@@ -276,7 +316,10 @@ export default function Dashboard() {
                     <MoreVertical className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
-                
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem>View Details</DropdownMenuItem>
+                  <DropdownMenuItem onClick={downloadPieCSV}>Download Data</DropdownMenuItem>
+                </DropdownMenuContent>
               </DropdownMenu>
             </CardHeader>
             <CardContent>
@@ -309,84 +352,134 @@ export default function Dashboard() {
           </Button>
         </div>
 
-        <div className="overflow-hidden rounded-lg bg-white shadow">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b text-left text-sm text-gray-500">
-                  <th className="px-4 py-3">#</th>
-                  <th className="px-4 py-3">Student</th>
-                  <th className="px-4 py-3">Predicted Date</th>
-                  <th className="px-4 py-3">Prediction</th>
-                  <th className="px-4 py-3"></th>
-                </tr>
-              </thead>
-              <tbody>
-                { paginatedStudents.map((student) => (
-                  <tr key={student.id} className="border-b text-sm">
-                    <td className="px-4 py-3 text-pink-500">{student.student_id}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="h-8 w-8 overflow-hidden rounded-full">
-                          <Image
-                            src={student.avatar || "/placeholder.svg"}
-                            alt={student.student_name}
-                            width={32}
-                            height={32}
-                            className="h-full w-full object-cover"
-                          />
-                        </div>
-                        <div>
-                          <div className="font-medium">{student.student_name}</div>
-                          <div className="text-xs text-gray-500">Class {student.class}</div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {student.predictedDate}
-                      <div className="text-xs text-gray-500">{student.predicted_date}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
-                          student.prediction === "Will DropOut" ? "bg-red-100 text-red-600" : "bg-green-100 text-green-600"
-                        }`}
-                      >
-                        {student.prediction}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      {/* <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreVertical className="h-4 w-4" />
-                            <span className="sr-only">More</span>
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem>View Details</DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu> */}
-                    </td>
-                  </tr>
+        <div className="rounded-lg border bg-white">
+          {studentPredictions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12">
+              <div className="mb-4 rounded-lg bg-gray-100 p-3">
+                <FileSpreadsheet className="h-8 w-8 text-gray-400" />
+              </div>
+              <p className="mb-2 text-sm font-medium text-gray-600">No student data available</p>
+              <p className="mb-6 text-xs text-gray-500">Upload student data to see predictions</p>
+              <Button asChild variant="outline" size="sm">
+                <Link href="/upload" className="flex items-center gap-2">
+                  <FileSpreadsheet className="h-4 w-4" />
+                  Upload Data
+                </Link>
+              </Button>
+            </div>
+          ) : (
+            <>
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b bg-gray-50 text-sm font-medium text-gray-500">
+                      <th className="px-4 py-3 text-left">Student Name</th>
+                      <th className="px-4 py-3 text-left">Class</th>
+                      <th className="px-4 py-3 text-left">Prediction</th>
+                      <th className="px-4 py-3 text-left"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {paginatedStudents.map((student) => (
+                      <tr key={student.student_id} className="border-b text-sm">
+                        <td className="px-4 py-3">{student.student_name}</td>
+                        <td className="px-4 py-3">{student.class}</td>
+                        <td className="px-4 py-3">
+                          <span
+                            className={`inline-block rounded-full px-3 py-1 text-xs font-medium ${
+                              student.prediction === "Will DropOut"
+                                ? "bg-red-100 text-red-600"
+                                : "bg-green-100 text-green-600"
+                            }`}
+                          >
+                            {student.prediction}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Link 
+                              href={`/predictions?student=${encodeURIComponent(student.student_name)}`}
+                              className="text-blue-600 hover:text-blue-800"
+                            >
+                              View Details
+                            </Link>
+                            <button
+                              onClick={async () => {
+                                if (confirm(`Are you sure you want to delete ${student.student_name}?`)) {
+                                  try {
+                                    const response = await fetchWithAuth(`/students/${student.student_id}`, {
+                                      method: 'DELETE'
+                                    });
+                                    if (response?.ok) {
+                                      // Refresh all dashboard data
+                                      const statsResponse = await fetchWithAuth('/stats');
+                                      if (statsResponse) {
+                                        const statsData = await statsResponse.json();
+                                        setStudentPredictions(statsData.student_predictions);
+                                        setStats({
+                                          total_students: statsData.total_students,
+                                          dropout_rate: statsData.dropout_rate,
+                                          continue_rate: statsData.continue_rate,
+                                          predictions_made: statsData.predictions_made
+                                        });
+                                        setTrendData({
+                                          labels: statsData.monthly_trends.map((entry: any) => {
+                                            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                                            return monthNames[entry.month - 1];
+                                          }),
+                                          dropoutData: statsData.monthly_trends.map((entry: any) => entry.dropout_count),
+                                          continueData: statsData.monthly_trends.map((entry: any) => entry.continue_count)
+                                        });
+                                        setPredictions(statsData.recent_predictions);
+                                      }
+                                    }
+                                  } catch (error) {
+                                    console.error('Error deleting student:', error);
+                                  }
+                                }
+                              }}
+                              className="text-red-600 hover:text-red-800"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex items-center justify-between border-t px-4 py-3">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  disabled={currentPage === 1}
+                  onClick={() => goToPage(currentPage - 1)}
+                >
+                  &lt;
+                </Button>
+                {[...Array(totalPages)].map((_, index) => (
+                  <Button
+                    key={index}
+                    variant={currentPage === index + 1 ? "outline" : "ghost"}
+                    size="icon"
+                    onClick={() => goToPage(index + 1)}
+                  >
+                    {index + 1}
+                  </Button>
                 ))}
-              </tbody>
-            </table>
-          </div>
-          <div className="flex items-center justify-between border-t px-4 py-3">
-        <Button variant="ghost" size="icon" disabled={currentPage === 1} onClick={() => goToPage(currentPage - 1)}>
-          &lt;
-        </Button>
-        {[...Array(totalPages)].map((_, index) => (
-          <Button key={index} variant={currentPage === index + 1 ? "outline" : "ghost"} size="icon" onClick={() => goToPage(index + 1)}>
-            {index + 1}
-          </Button>
-        ))}
-        <Button variant="ghost" size="icon" disabled={currentPage === totalPages} onClick={() => goToPage(currentPage + 1)}>
-          &gt;
-        </Button>
-      </div>
-    </div>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  disabled={currentPage === totalPages}
+                  onClick={() => goToPage(currentPage + 1)}
+                >
+                  &gt;
+                </Button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

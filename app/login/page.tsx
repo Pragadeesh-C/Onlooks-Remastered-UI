@@ -10,9 +10,12 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useApi } from '@/hooks/useApi';
+import { config } from '@/config';
 
 export default function LoginPage() {
   const router = useRouter()
+  const { fetchWithAuth } = useApi();
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -39,42 +42,34 @@ export default function LoginPage() {
   
     }, [router]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError('');
     setIsLoading(true);
 
-    // Validate form
-    if (!email || !password) {
-        setError("Please fill in all fields");
-        setIsLoading(false);
-        return;
-    }
-
     try {
-        const response = await fetch("http://127.0.0.1:8000/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password })
-        });
+      const response = await fetch(`${config.apiUrl}/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-        const res = await response.json();
+      const data = await response.json();
 
-        if (!response.ok) {
-            throw new Error(res.detail || "Login failed");
-        }
+      if (!response.ok) {
+        throw new Error(data.detail || 'Login failed');
+      }
 
-        // Save token to localStorage
-        localStorage.setItem("token", res.token);
-
-        // Redirect to dashboard on success
-        router.push("/dashboard");
+      localStorage.setItem('token', data.token);
+      router.push('/dashboard');
     } catch (err: any) {
-        setError(err.message || "Something went wrong");
+      setError(err.message || 'Failed to login');
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
-};
+  };
 
 
   return (

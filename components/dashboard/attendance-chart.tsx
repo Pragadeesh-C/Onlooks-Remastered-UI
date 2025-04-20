@@ -1,9 +1,10 @@
 "use client"
 
 import { useEffect, useRef, useState } from "react"
-import { Chart, registerables } from "chart.js"
-
-Chart.register(...registerables)
+import { Chart } from "chart.js/auto"
+import { PieChart } from "lucide-react"
+import { useApi } from '@/hooks/useApi';
+import { useRouter } from 'next/navigation';
 
 export function DashboardChart() {
   const chartRef = useRef<HTMLCanvasElement>(null)
@@ -12,30 +13,35 @@ export function DashboardChart() {
     dropout_rate: 0,
     continue_rate: 0,
   })
+  const { fetchWithAuth } = useApi();
+  const router = useRouter();
 
   useEffect(() => {
-    // Fetch data from the stats route (replace this with your actual API request)
     const fetchStats = async () => {
       try {
-        const response = await fetch("/stats")
-        const data = await response.json()
+        const response = await fetchWithAuth("/stats");
+        if (response === null) {
+          return; // Early return if we got a 401 (handled by useApi)
+        }
+
+        const data = await response.json();
         setStats({
           dropout_rate: data.dropout_rate,
           continue_rate: data.continue_rate,
-        })
+        });
       } catch (error) {
-        console.error("Error fetching stats:", error)
+        console.error("Error fetching stats:", error);
       }
-    }
+    };
 
-    fetchStats()
+    fetchStats();
 
     return () => {
       if (chartInstance.current) {
-        chartInstance.current.destroy()
+        chartInstance.current.destroy();
       }
-    }
-  }, [])
+    };
+  }, []);
 
   useEffect(() => {
     if (!chartRef.current) return
@@ -47,6 +53,12 @@ export function DashboardChart() {
 
     // Create new chart with fetched data
     const { dropout_rate, continue_rate } = stats
+    
+    // If both rates are 0, don't create the chart
+    if (dropout_rate === 0 && continue_rate === 0) {
+      return
+    }
+
     const data = [dropout_rate, continue_rate]
     const labels = ["Dropout Rate", "Continue Rate"]
 
@@ -98,6 +110,18 @@ export function DashboardChart() {
       }
     }
   }, [stats])
+
+  if (stats.dropout_rate === 0 && stats.continue_rate === 0) {
+    return (
+      <div className="flex h-[300px] w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-200 bg-gray-50">
+        <div className="mb-4 rounded-lg bg-gray-100 p-3">
+          <PieChart className="h-8 w-8 text-gray-400" />
+        </div>
+        <p className="mb-2 text-sm font-medium text-gray-600">No overview data available</p>
+        <p className="text-xs text-gray-500">Upload student data to see dropout overview</p>
+      </div>
+    )
+  }
 
   return (
     <div className="h-[300px] w-full">

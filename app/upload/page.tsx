@@ -11,10 +11,13 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
 import { Navbar } from "@/components/layout/navbar"
 import { usePredictions } from "@/context/prediction-context"
+import { useApi } from '@/hooks/useApi'
+import { config } from '@/config'
 
 export default function UploadPage() {
   const router = useRouter()
   const { setPredictions } = usePredictions()
+  const { fetchWithAuth } = useApi()
   const [file, setFile] = useState<File | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
@@ -23,6 +26,10 @@ export default function UploadPage() {
   const [success, setSuccess] = useState(false)
   const [apiResponse, setApiResponse] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [processingProgress, setProcessingProgress] = useState(0)
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [analyzeProgress, setAnalyzeProgress] = useState(0)
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
@@ -70,72 +77,119 @@ export default function UploadPage() {
     setFile(file)
   }
 
-  const handleUpload = async () => {
-    if (!file) return
-
-    setIsUploading(true)
-    setIsLoading(true)
-    setUploadProgress(0)
-    setApiResponse(null)
-
-    const formData = new FormData()
-    formData.append("file", file)
-
+  const simulateAnalysis = () => {
+    setIsAnalyzing(true)
+    setAnalyzeProgress(0)
+    
     const interval = setInterval(() => {
-      setUploadProgress((prev) => {
+      setAnalyzeProgress((prev) => {
         if (prev >= 95) {
           clearInterval(interval)
           return prev
         }
-        return prev + 5
+        return prev + Math.random() * 10
       })
-    }, 200)
+    }, 600)
+
+    return () => clearInterval(interval)
+  }
+
+  const handleUpload = async (formData: FormData) => {
+    if (!file) return;
+
+    setIsUploading(true);
+    setIsAnalyzing(false);
+    setUploadProgress(0);
+    setAnalyzeProgress(0);
+    setError(null);
+    setSuccess(false);
 
     try {
-      const token = localStorage.getItem("token"); // Get JWT token from storage
-    
-      const response = await fetch("http://127.0.0.1:8000/upload", {
-        headers: {
-          "Authorization": `Bearer ${token}`, // Attach Bearer token
-        },
-        method: "POST",
-        body: formData,
-      });
-    
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || "Upload failed"); // Throw error for catch block
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${config.apiUrl}/upload/`, true);
+
+      const token = localStorage.getItem('token');
+      if (token) {
+        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       }
-    
-      const resp = await response.json(); // Parse JSON response
-    
-      const formattedData = resp.map((item: { [x: string]: any }) => ({
-        ML_Prediction: item["ML Prediction"],
-        Similar_Students: item["Similar Students"],
-        Insights: item["Insights"],
-      }));
-    
-      // Store the predictions in context
-      setPredictions(formattedData);
-      setApiResponse(JSON.stringify(resp, null, 2));
-    
-      setSuccess(true);
-      setUploadProgress(100);
-    
-      // Redirect to predictions page after successful upload
-      setTimeout(() => {
-        router.push("/predictions");
-      }, 1500);
-    } catch (err: any) {
-      console.error("Upload Error:", err.message);
-      setError(err.message || "Failed to upload file. Please try again.");
-    } finally {
-      clearInterval(interval);
+
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const progress = Math.round((event.loaded / event.total) * 100);
+          setUploadProgress(Math.min(95, progress + Math.random() * 5));
+        }
+      };
+
+      xhr.onload = async () => {
+        try {
+          if (xhr.status === 200) {
+            setUploadProgress(100);
+            setIsUploading(false);
+            setIsAnalyzing(true);
+            
+            const interval = setInterval(() => {
+              setAnalyzeProgress((prev) => {
+                if (prev >= 95) {
+                  clearInterval(interval);
+                  return prev;
+                }
+                return prev + Math.random() * 10;
+              });
+            }, 600);
+            
+            const data = JSON.parse(xhr.responseText);
+            const predictions = data.map((item: any) => ({
+              student_name: item["Student Name"] || item.student_name || item.name,
+              Student_Name: item["Student Name"] || item.student_name || item.name,
+              ML_Prediction: item["ML Prediction"] || item.ML_Prediction,
+              Similar_Students: item["Similar Students"] || item.Similar_Students || [],
+              Insights: item.Insights || ""
+            }));
+            
+            setAnalyzeProgress(100);
+            clearInterval(interval);
+            setPredictions(predictions);
+            
+            setTimeout(() => {
+              setSuccess(true);
+              setIsAnalyzing(false);
+              router.push('/predictions');
+            }, 1000);
+          } else {
+            const errorData = JSON.parse(xhr.responseText);
+            if (xhr.status === 401 && errorData.detail === "Token has expired") {
+              // Clear token and redirect to login
+              localStorage.removeItem('token');
+              router.push('/login');
+              setError('Session expired. Please log in again.');
+            } else {
+              setError(errorData.detail || 'Upload failed. Please try again.');
+            }
+            setIsUploading(false);
+            setIsAnalyzing(false);
+          }
+        } catch (parseError) {
+          console.error('Error parsing response:', parseError);
+          setError('Invalid response from server');
+          setIsAnalyzing(false);
+          setIsUploading(false);
+        }
+      };
+
+      xhr.onerror = () => {
+        setError('Network error occurred. Please try again.');
+        setIsUploading(false);
+        setIsAnalyzing(false);
+      };
+
+      xhr.send(formData);
+    } catch (error) {
+      console.error('Upload error:', error);
+      setError('Failed to upload file');
       setIsUploading(false);
-      setIsLoading(false);
+      setIsAnalyzing(false);
     }
-    
-  }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#c9f0ff] via-[#f5e6fb] to-[#ffcef3]">
@@ -215,23 +269,58 @@ export default function UploadPage() {
                 )}
               </div>
 
-              {isUploading && (
+              {(isUploading || isAnalyzing) && (
                 <div className="mb-4">
                   <div className="mb-1 flex justify-between text-sm">
-                    <span>Uploading...</span>
-                    <span>{uploadProgress}%</span>
+                    <span className="flex items-center gap-2">
+                      {isAnalyzing ? (
+                        <>
+                          <svg className="h-4 w-4 animate-spin text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          Analyzing student data...
+                        </>
+                      ) : (
+                        "Uploading..."
+                      )}
+                    </span>
+                    <span>{isAnalyzing ? `${Math.round(analyzeProgress)}%` : `${Math.round(uploadProgress)}%`}</span>
                   </div>
-                  <Progress value={uploadProgress} className="h-2" />
+                  <Progress 
+                    value={isAnalyzing ? analyzeProgress : uploadProgress} 
+                    className={`h-2 transition-all duration-300 ${
+                      isAnalyzing ? 'bg-indigo-200' : 'bg-pink-200'
+                    }`}
+                  />
+                  {isAnalyzing && (
+                    <div className="mt-4 space-y-2 rounded-lg bg-indigo-50 p-4 text-sm text-indigo-700">
+                      <p className="font-medium">Analysis in progress:</p>
+                      <ul className="list-inside list-disc space-y-1 pl-4">
+                        <li>Processing student data</li>
+                        <li>Generating ML predictions</li>
+                        <li>Creating personalized insights</li>
+                        <li>Identifying risk factors</li>
+                      </ul>
+                    </div>
+                  )}
                 </div>
               )}
 
               <div className="flex justify-end">
                 <Button
-                  onClick={handleUpload}
-                  disabled={!file || isLoading || success}
+                  type="button"
+                  onClick={() => {
+                    const formData = new FormData();
+                    if (file) {
+                      formData.append('file', file);
+                      handleUpload(formData);
+                    }
+                  }}
+                  disabled={!file || isUploading || isAnalyzing || success}
                   className="bg-pink-500 hover:bg-pink-600"
                 >
-                  {isUploading ? "Uploading..." : "Upload and Analyze"}
+                  {isUploading ? "Uploading..." : isAnalyzing ? "Analyzing..." : "Upload and Analyze"}
                 </Button>
               </div>
             </CardContent>
@@ -281,14 +370,13 @@ export default function UploadPage() {
                   <h3 className="mb-1 font-medium">Need Help?</h3>
                   <p className="text-sm text-gray-500">
                     Download our{" "}
-                    <a href="#" className="text-pink-500 hover:underline">
+                    <a 
+                      href="/sample_template.csv" 
+                      download="student-data-template.csv"
+                      className="text-pink-500 hover:underline"
+                    >
                       sample template
-                    </a>{" "}
-                    or contact{" "}
-                    <a href="#" className="text-pink-500 hover:underline">
-                      support
                     </a>
-                    .
                   </p>
                 </div>
               </div>

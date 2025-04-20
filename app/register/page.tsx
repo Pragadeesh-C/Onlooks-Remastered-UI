@@ -11,16 +11,18 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { useApi } from '@/hooks/useApi';
+import { config } from '@/config';
 
 export default function RegisterPage() {
   const router = useRouter()
+  const { fetchWithAuth } = useApi();
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
     school_name: "",
-    role: "",
   })
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -51,74 +53,40 @@ export default function RegisterPage() {
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData((prev) => ({ ...prev, [name]: value }))
-  }
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setError('');
+    setIsLoading(true);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError(null)
+    try {
+      const response = await fetch(`${config.apiUrl}/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          school_name: formData.school_name,
+          role: "teacher",
+        }),
+      });
 
-    // Validate form
-    if (
-      !formData.name ||
-      !formData.email ||
-      !formData.password ||
-      !formData.confirmPassword ||
-      !formData.school_name ||
-      !formData.role
-    ) {
-      setError("Please fill in all fields")
-      return
-    }
+      const data = await response.json();
 
-    if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match")
-      return
-    }
-    if (formData.password.length < 8) {
-      setError("Password must be at least 8 characters long")
-      return
-    }
-    const { confirmPassword, ...dataToSend } = formData;
-    await fetch("http://127.0.0.1:8000/register", {
-      method: "POST",
-      headers: {
-          "Content-Type": "application/json",
-      },
-      body: JSON.stringify(dataToSend),
-  })
-  .then(async response => {
-      const res = await response.json();
-  
       if (!response.ok) {
-          alert(`Error: ${res.detail || "Something went wrong"}`); // Show error in a dialog box
-          throw new Error(res.detail || "Registration failed");
+        throw new Error(data.detail || 'Registration failed');
       }
-  
-      console.log(res, "res");
-      alert("User registered successfully!"); // Success message
-      localStorage.setItem("token", res.token); // Save token
-      router.push("/dashboard");
-      setIsLoading(false)
-  })
-  .catch(error => console.error("Error:", error));
-  
-    
 
-
-    // try {
-    //   // Simulate API call
-      
-
-    //   // Redirect to login on success
-    //   router.push("/login?registered=true")
-    // } catch (err) {
-    //   setError("Failed to register. Please try again.")
-    // } finally {
-    //   setIsLoading(false)
-    // }
-  }
+      localStorage.setItem('token', data.token);
+      router.push('/dashboard');
+    } catch (err: any) {
+      setError(err.message || 'Failed to register');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-[#c9f0ff] via-[#f5e6fb] to-[#ffcef3] p-4">
@@ -166,32 +134,16 @@ export default function RegisterPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="school">School Name</Label>
-                  <Input
-                    id="school_name"
-                    name="school_name"
-                    placeholder="ABC School"
-                    value={formData.school_name}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="role">Role</Label>
-                  <Select value={formData.role} onValueChange={(value) => handleSelectChange("role", value)}>
-                    <SelectTrigger id="role">
-                      <SelectValue placeholder="Select role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="teacher">Teacher</SelectItem>
-                      <SelectItem value="principal">Principal</SelectItem>
-                      <SelectItem value="admin">Administrator</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="school">School Name</Label>
+                <Input
+                  id="school_name"
+                  name="school_name"
+                  placeholder="ABC School"
+                  value={formData.school_name}
+                  onChange={handleChange}
+                  required
+                />
               </div>
 
               <div className="space-y-2">

@@ -3,6 +3,8 @@
 import { createContext, useContext, useState, type ReactNode } from "react"
 
 export type StudentPrediction = {
+  Student_Name: string
+  student_name: string
   ML_Prediction: string
   Similar_Students: any[]
   Insights: string
