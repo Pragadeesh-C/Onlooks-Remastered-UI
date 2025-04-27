@@ -11,10 +11,22 @@ import Link from "next/link"
 interface PredictionCardProps {
   prediction: StudentPrediction
   index: number
+  isExpanded?: boolean
+  onExpandChange?: (expanded: boolean) => void
 }
 
-export function PredictionCard({ prediction, index }: PredictionCardProps) {
-  const [expanded, setExpanded] = useState(false)
+export function PredictionCard({ prediction, index, isExpanded: controlledExpanded, onExpandChange }: PredictionCardProps) {
+  const [internalExpanded, setInternalExpanded] = useState(false)
+  const expanded = controlledExpanded ?? internalExpanded
+
+  const handleExpandChange = () => {
+    const newExpanded = !expanded
+    if (onExpandChange) {
+      onExpandChange(newExpanded)
+    } else {
+      setInternalExpanded(newExpanded)
+    }
+  }
 
   // Ensure we have the correct values
   const isDropout = prediction.ML_Prediction === "Will DropOut"
@@ -77,7 +89,7 @@ export function PredictionCard({ prediction, index }: PredictionCardProps) {
         <Button
           variant="ghost"
           size="icon"
-          onClick={() => setExpanded(!expanded)}
+          onClick={handleExpandChange}
           aria-label={expanded ? "Collapse details" : "Expand details"}
         >
           {expanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}

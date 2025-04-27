@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import Link from "next/link"
 import { ArrowLeft, Download, FileSpreadsheet, Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -16,6 +16,27 @@ export default function PredictionsPage() {
   const { predictions, hasPredictions } = usePredictions()
   const [searchTerm, setSearchTerm] = useState("")
   const { toast } = useToast()
+  const [expandedStudent, setExpandedStudent] = useState<string | null>(null)
+  const studentCardRef = useRef<HTMLDivElement>(null)
+
+  // Get student name from URL query parameter and scroll to the card
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const studentName = params.get('student')
+    if (studentName) {
+      setExpandedStudent(studentName)
+      
+      // Wait for the DOM to update with the expanded card
+      setTimeout(() => {
+        if (studentCardRef.current) {
+          studentCardRef.current.scrollIntoView({ 
+            behavior: 'smooth', 
+            block: 'center' 
+          })
+        }
+      }, 300) // Small delay to ensure the card is rendered
+    }
+  }, [])
 
   // Count predictions by type
   const dropoutCount = predictions.filter((p) => p.ML_Prediction === "Will DropOut").length
@@ -180,7 +201,23 @@ export default function PredictionsPage() {
 
           <TabsContent value="all" className="space-y-4">
             {filteredPredictions("all").map((prediction, index) => (
-              <PredictionCard key={index} prediction={prediction} index={index} />
+              <div 
+                key={index}
+                ref={expandedStudent === (prediction.student_name || prediction.Student_Name) ? studentCardRef : null}
+              >
+                <PredictionCard 
+                  prediction={prediction} 
+                  index={index}
+                  isExpanded={expandedStudent === (prediction.student_name || prediction.Student_Name)}
+                  onExpandChange={(expanded) => {
+                    if (expanded) {
+                      setExpandedStudent(prediction.student_name || prediction.Student_Name)
+                    } else {
+                      setExpandedStudent(null)
+                    }
+                  }}
+                />
+              </div>
             ))}
             {filteredPredictions("all").length === 0 && (
               <div className="flex flex-col items-center justify-center rounded-lg bg-white p-8 text-center shadow-md">
@@ -193,7 +230,23 @@ export default function PredictionsPage() {
 
           <TabsContent value="Will DropOut" className="space-y-4">
             {filteredPredictions("Will DropOut").map((prediction, index) => (
-              <PredictionCard key={index} prediction={prediction} index={index} />
+              <div 
+                key={index}
+                ref={expandedStudent === (prediction.student_name || prediction.Student_Name) ? studentCardRef : null}
+              >
+                <PredictionCard 
+                  prediction={prediction} 
+                  index={index}
+                  isExpanded={expandedStudent === (prediction.student_name || prediction.Student_Name)}
+                  onExpandChange={(expanded) => {
+                    if (expanded) {
+                      setExpandedStudent(prediction.student_name || prediction.Student_Name)
+                    } else {
+                      setExpandedStudent(null)
+                    }
+                  }}
+                />
+              </div>
             ))}
             {filteredPredictions("Will DropOut").length === 0 && (
               <div className="flex flex-col items-center justify-center rounded-lg bg-white p-8 text-center shadow-md">
@@ -206,7 +259,23 @@ export default function PredictionsPage() {
 
           <TabsContent value="Will Continue" className="space-y-4">
             {filteredPredictions("Will Continue").map((prediction, index) => (
-              <PredictionCard key={index} prediction={prediction} index={index} />
+              <div 
+                key={index}
+                ref={expandedStudent === (prediction.student_name || prediction.Student_Name) ? studentCardRef : null}
+              >
+                <PredictionCard 
+                  prediction={prediction} 
+                  index={index}
+                  isExpanded={expandedStudent === (prediction.student_name || prediction.Student_Name)}
+                  onExpandChange={(expanded) => {
+                    if (expanded) {
+                      setExpandedStudent(prediction.student_name || prediction.Student_Name)
+                    } else {
+                      setExpandedStudent(null)
+                    }
+                  }}
+                />
+              </div>
             ))}
             {filteredPredictions("Will Continue").length === 0 && (
               <div className="flex flex-col items-center justify-center rounded-lg bg-white p-8 text-center shadow-md">

@@ -42,7 +42,6 @@ export function useApi() {
 
       const response = await fetch(`${config.apiUrl}${endpoint}`, {
         ...options,
-        credentials: 'include',
         mode: 'cors',
         headers: {
           ...headers,

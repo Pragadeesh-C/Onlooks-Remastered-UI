@@ -244,7 +244,6 @@ export default function Dashboard() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem>View Details</DropdownMenuItem>
                   <DropdownMenuItem onClick={downloadTrendsCSV}>Download Data</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -395,7 +394,7 @@ export default function Dashboard() {
                             {student.prediction}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-2">
                             <Link 
                               href={`/predictions?student=${encodeURIComponent(student.student_name)}`}
